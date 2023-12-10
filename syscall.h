@@ -20,3 +20,8 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+#define SYS_get_callers 22
+#define SYS_print_all_procs_status 23
+#define SYS_set_proc_queue 24
+#define SYS_set_bjf_params 26
+#define SYS_set_all_bjf_params 27

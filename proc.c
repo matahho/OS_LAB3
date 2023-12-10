@@ -15,6 +15,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int nextLCFS = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -88,6 +89,21 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+
+  p->queue = LCFS;                            // default queue: LCFS ***************************************
+  p->lcsf_order = nextLCFS++;
+  p->creation_time = ticks;
+  p->waited_start_time = p->creation_time;
+  p->executed_cycle = 0;
+
+  acquire(&tickslock);
+  p->priority = (ticks * ticks * 1021) % 100;   // generates a pseudorandom priority 
+  release(&tickslock);
+
+  p->priority_ratio = 0.2;
+  p->executed_cycle_ratio = 0.2;
+  // p->creation_time_ratio = 0.2;
+  p->arrival_time_ratio = 0.2;
 
   release(&ptable.lock);
 
@@ -311,6 +327,103 @@ wait(void)
   }
 }
 
+//**************************************************************************************************************
+// BJF scheduler
+
+int calculate_rank(struct proc* p){
+  return ((p->priority * p->priority_ratio) +
+          (p->creation_time * p->arrival_time_ratio) +
+          (p->executed_cycle * p->executed_cycle_ratio));
+}
+
+struct proc* best_job_first(void)
+{
+  struct proc* p;
+  struct proc* best_proc = 0;
+  float min_rank = 999999999;
+  float rank;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ 
+    if (p->state != RUNNABLE)
+      continue;
+    else if (p->queue != 3) 
+      continue;
+    
+    rank =  calculate_rank(p);
+
+    if (rank < min_rank){
+      best_proc = p;
+      min_rank = rank;
+    }
+  }
+
+  return best_proc;
+}
+
+void aging(void)
+{
+  struct proc* p = 0;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+
+    // p->waited_cycles = ticks - creation_tie;
+
+    // if (p->state != RUNNABLE || p->queue == 1)
+    //   continue;
+
+    if (p->queue == 1)
+      continue;
+
+
+    if (ticks - p->creation_time > 1000) {
+      p->queue = 1;
+      p->waited_start_time = 0;
+    }
+  }
+}
+
+struct proc* LCFSSched(void){
+  struct proc *p;
+  int target_pid = -1;
+  int stack_top = -1;
+  
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state != RUNNABLE || p->queue != LCFS)
+      continue;
+    if(p->lcsf_order > stack_top){
+      target_pid = p->pid;
+    }
+  }
+  
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state != RUNNABLE || p->queue != LCFS)
+      continue;
+    
+    if(p->pid == target_pid)
+      return p;
+    }
+
+  return 0;
+}
+
+// Round Robin schedular
+
+struct proc* round_robin(void)
+{
+  struct proc *p;
+  struct proc *best_proc = 0;
+
+
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if (p->state != RUNNABLE || p->queue != ROUNDROBIN)
+        continue;
+
+      return p;
+  }
+  return best_proc;
+}
+//****************************************************************************************************************
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -319,41 +432,54 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void
+void //*********************************************************************************************************
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
-  for(;;){
+
+  for (;;)
+  {
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    p = round_robin();
+    if (p == 0) {
+      p = LCFSSched();
     }
-    release(&ptable.lock);
+    if (p == 0) {
+      p = best_job_first();
+    }
+    if (p == 0) {
+      release(&ptable.lock);
+      continue;
+    }
+    // cprintf("%d" , p->waited_cycles);
+    aging();
+    
 
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    p->waited_start_time = 0;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+
+    release(&ptable.lock);
   }
 }
+//***********************************************************************************************************
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
@@ -382,11 +508,13 @@ sched(void)
 }
 
 // Give up the CPU for one scheduling round.
-void
-yield(void)
+void //********************************************************************************************************
+ yield(void)
 {
-  acquire(&ptable.lock);  //DOC: yieldlock
+  acquire(&ptable.lock); // DOC: yieldlock
   myproc()->state = RUNNABLE;
+  myproc()->executed_cycle += 0.1;
+  myproc()->last_executed_time = ticks;
   sched();
   release(&ptable.lock);
 }
@@ -532,3 +660,217 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+//*************************************************************************************************************
+struct calling_process
+{
+  int pids[1000];
+  int size;
+};
+
+struct calling_process call_ps[26] = {0};
+
+void push_callerp(int pid, int num)
+{
+  int this_size = call_ps[num].size;
+  call_ps[num].size++;
+  call_ps[num].pids[this_size] = pid;
+}
+
+void get_callers(int sys_call_number)
+{
+  int size_of_callers = call_ps[sys_call_number].size;
+  for (int i = 0; i < size_of_callers-1; i++)
+  {
+    cprintf("%d, ", call_ps[sys_call_number].pids[i]);
+  }
+  cprintf("%d", call_ps[sys_call_number].pids[size_of_callers-1]);
+}
+
+char* get_state_name(int state)
+{
+  if (state == 0)
+    return "UNUSED";
+
+  else if (state == 1) 
+    return "EMBRYO";
+  
+  else if (state == 2) 
+    return "SLEEPING";
+  
+  else if (state == 3) 
+    return "RUNNABLE";
+  
+  else if (state == 4) 
+    return "RUNNING";
+  
+  else if (state == 5) 
+    return "ZOMBIE";
+  
+  else 
+    return "";
+}
+
+char* get_queue_name(int level)
+{
+  if (level == 1)
+    return "RoundRobin";
+
+  else if (level == 2)
+    return "LCFS";
+
+  else if (level == 3)
+    return "BJF"; 
+
+  else
+    return "Undefined";
+}
+
+int get_num_len(int number)
+{
+  int len = 0;
+
+  if (number == 0)
+    return 1;
+
+  while (number > 0){
+    len++;
+    number = number / 10;
+  }
+  return len;
+}
+
+
+void print_all_procs_status()
+{
+  struct proc *p;
+  cprintf("\n");
+  cprintf("Name");
+  for (int i = 0 ; i < 15 - strlen("name") ; i++)
+    cprintf(" ");
+
+  cprintf("Pid");
+  for (int i = 0 ; i < 10 - strlen("pid") ; i++)
+    cprintf(" ");
+
+  cprintf("State");
+  for (int i = 0 ; i < 15 - strlen("state") ; i++)
+    cprintf(" ");
+
+  cprintf("Queue_level");
+  for (int i = 0 ; i < 17 - strlen("queue_level") ; i++)
+    cprintf(" ");
+
+  cprintf("Arrival");
+  for (int i = 0 ; i < 12 - strlen("arrival") ; i++)
+    cprintf(" ");
+
+  cprintf("BJF_Rank");
+  for (int i = 0 ; i < 12 - strlen("bjf_Rank") ; i++)
+    cprintf(" ");
+
+  cprintf("p/e/a ratio*10");
+  for (int i = 0 ; i < 20 - strlen("p/e/a ratio*10") ; i++)
+    cprintf(" ");
+
+  cprintf("executed_cycles*10");
+  for (int i = 0 ; i < 20 - strlen("executed_cycles*10") ; i++)
+    cprintf(" ");
+
+  cprintf("\n");
+  for (int i = 0 ; i < 140 ; i++)
+    cprintf("-");
+  cprintf("\n");
+
+  acquire(&ptable.lock);                                                  // Lock procs table to get current information (in order to stop procs table changing)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){ 
+    if (p->state == UNUSED)
+      continue;
+
+    cprintf(p->name);
+    for (int i = 0 ; i < 15 - strlen(p->name) ; i++)
+      cprintf(" ");
+
+    cprintf("%d", p->pid);
+    for (int i = 0 ; i < 10 - get_num_len(p->pid) ; i++)
+      cprintf(" ");
+
+    cprintf(get_state_name(p->state));
+    for (int i = 0 ; i < 15 - strlen(get_state_name(p->state)) ; i++)
+      cprintf(" "); 
+
+    cprintf(get_queue_name(p->queue));
+    for (int i = 0 ; i < 17 - strlen(get_queue_name(p->queue)) ; i++)
+      cprintf(" "); 
+
+    cprintf("%d" , p->creation_time);
+    for (int i = 0 ; i < 17 - get_num_len(p->creation_time) ; i++)
+      cprintf(" ");
+
+    cprintf("%d" , calculate_rank(p));
+    for (int i = 0 ; i < 15 - get_num_len(calculate_rank(p)) ; i++)
+      cprintf(" ");
+
+    int pRate = p->priority_ratio * 10;
+    int eRate = p->executed_cycle_ratio * 10;
+    int aRate = p->arrival_time_ratio * 10;
+
+    cprintf("%d %d %d" , pRate , eRate , aRate);
+    for (int i = 0 ; i < 17 - (get_num_len(pRate) + get_num_len(eRate) + get_num_len(aRate)) ; i++)
+      cprintf(" ");
+
+    cprintf("%d" , p->executed_cycle * 10);
+    for (int i = 0 ; i < 15 - get_num_len(p->executed_cycle) ; i++)
+      cprintf(" ");
+
+    cprintf("\n");
+  }
+  cprintf("\n");
+  release(&ptable.lock);
+
+}
+
+void set_proc_queue(int pid, int queue_level)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->pid == pid){
+      p->queue = queue_level;
+      p->waited_start_time = 0;
+    }
+  release(&ptable.lock);
+}
+
+void set_bjf_params(int pid, int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->pid == pid)
+    {
+      p->priority_ratio = priority_ratio;
+      p->arrival_time_ratio = arrival_time_ratio;
+      p->executed_cycle_ratio = executed_cycle_ratio; 
+    }
+  }
+  release(&ptable.lock); 
+}
+
+void set_all_bjf_params(int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+      p->priority_ratio = priority_ratio;
+      p->arrival_time_ratio = arrival_time_ratio;
+      p->executed_cycle_ratio = executed_cycle_ratio; 
+  }
+  release(&ptable.lock); 
+}
+//*****************************************************************************************************************

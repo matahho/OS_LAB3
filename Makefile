@@ -181,6 +181,11 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_procs_status\
+	_set_queue\
+	_foo\
+	_set_bjf_params\
+	_set_all_bjf_params\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

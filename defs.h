@@ -120,6 +120,14 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+//*****************************************************************************************
+void            push_callerp(int,int);
+void            get_callers(int); //???????????????????????????????????????????????
+void            print_all_procs_status(void);
+void            set_proc_queue(int , int);
+void            set_bjf_params(int, int, int, int);
+void            set_all_bjf_params(int, int, int);
+//************************************************************
 
 // swtch.S
 void            swtch(struct context**, struct context*);
