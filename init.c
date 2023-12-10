@@ -21,6 +21,10 @@ main(void)
 
   for(;;){
     printf(1, "init: starting sh\n");
+    printf(1 , "Make multipe process to test : foo&\n");
+    printf(1 , "Set a bjf params : set_bjf_params [PID] [P_ratio] [A_ratio] [E_ratio] [SZ]\n");
+    printf(1 , "Set all bjf params : set_all_bjf_params [P_ratio] [A_ratio] [E_ratio] [SZ]\n");
+    printf(1 , "Change a queue : set_queue [PID] [Destination(1 , 2 , 3)]\n");
     pid = fork();
     if(pid < 0){
       printf(1, "init: fork failed\n");

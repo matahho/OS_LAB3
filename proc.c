@@ -423,17 +423,8 @@ struct proc* round_robin(void)
   }
   return best_proc;
 }
-//****************************************************************************************************************
 
-//PAGEBREAK: 42
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run
-//  - swtch to start running that process
-//  - eventually that process transfers control
-//      via swtch back to the scheduler.
-void //*********************************************************************************************************
+void 
 scheduler(void)
 {
   struct proc *p = 0;
@@ -480,7 +471,6 @@ scheduler(void)
     release(&ptable.lock);
   }
 }
-//***********************************************************************************************************
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
