@@ -1,25 +1,26 @@
 #include "types.h"
-#include "stat.h"
 #include "user.h"
-#include "fcntl.h"
 
-int main(int argc, char *argv[])
+#define PROCS_NUM 5
+
+int main()
 {
-    int temp = 0;
-    int pid[10];
-    for (int i = 0 ; i < 10 ; i++)
-    {
-        temp = 0;
-        pid[i] = fork();
-        if(pid[i] < 0)
-            printf(1 , "fork failed\n");
-        if (pid[i] == 0)
+    for (int i = 0; i < PROCS_NUM; ++i){
+        int pid = fork();
+        if (pid > 0)
+            continue;
+        if (pid == 0)
         {
-            for (int j = 0 ; j < 100 ; j++)                     // remove one 0 from it for testing it faster
-                temp++;
+            sleep(5000);
+            for (int j = 0; j < 100 * i; ++j)
+            {
+                int x = 1;
+                for (long k = 0; k < 1000000000000; ++k)
+                    x++;
+            }
             exit();
         }
     }
-    while(wait());
-    return 0;
+    while (wait() != -1);
+    exit();
 }

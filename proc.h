@@ -67,7 +67,8 @@ struct proc {
   float arrival_time_ratio;      // arrival time ratio
   int waited_start_time;           // used for aging
   int lcsf_order;
-  long int last_executed_time; // last executed time        
+  long int last_executed_time; // last executed time  
+  int process_size_ratio;      
 //*************************************************************************************************************
 };
 

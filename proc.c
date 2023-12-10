@@ -104,6 +104,7 @@ found:
   p->executed_cycle_ratio = 0.2;
   // p->creation_time_ratio = 0.2;
   p->arrival_time_ratio = 0.2;
+  p->process_size_ratio = 1;
 
   release(&ptable.lock);
 
@@ -333,7 +334,7 @@ wait(void)
 int calculate_rank(struct proc* p){
   return ((p->priority * p->priority_ratio) +
           (p->creation_time * p->arrival_time_ratio) +
-          (p->executed_cycle * p->executed_cycle_ratio));
+          (p->executed_cycle * p->executed_cycle_ratio) + (p->sz * p->process_size_ratio));
 }
 
 struct proc* best_job_first(void)
@@ -769,8 +770,8 @@ void print_all_procs_status()
   for (int i = 0 ; i < 12 - strlen("bjf_Rank") ; i++)
     cprintf(" ");
 
-  cprintf("p/e/a ratio*10");
-  for (int i = 0 ; i < 20 - strlen("p/e/a ratio*10") ; i++)
+  cprintf("p-e-a-s ratio*100");
+  for (int i = 0 ; i < 20 - strlen("p-e-a-s ratio*100") ; i++)
     cprintf(" ");
 
   cprintf("executed_cycles*10");
@@ -811,12 +812,14 @@ void print_all_procs_status()
     for (int i = 0 ; i < 15 - get_num_len(calculate_rank(p)) ; i++)
       cprintf(" ");
 
-    int pRate = p->priority_ratio * 10;
-    int eRate = p->executed_cycle_ratio * 10;
-    int aRate = p->arrival_time_ratio * 10;
+    int pRate = p->priority_ratio * 100;
+    int eRate = p->executed_cycle_ratio * 100;
+    int aRate = p->arrival_time_ratio * 100;
+    int sRate = p->process_size_ratio * 100;
 
-    cprintf("%d %d %d" , pRate , eRate , aRate);
-    for (int i = 0 ; i < 17 - (get_num_len(pRate) + get_num_len(eRate) + get_num_len(aRate)) ; i++)
+
+    cprintf("%d %d %d %d" , pRate , eRate , aRate , sRate);
+    for (int i = 0 ; i < 17 - (get_num_len(pRate) + get_num_len(eRate) + get_num_len(aRate) + get_num_len(sRate)) ; i++)
       cprintf(" ");
 
     cprintf("%d" , p->executed_cycle * 10);
@@ -843,7 +846,7 @@ void set_proc_queue(int pid, int queue_level)
   release(&ptable.lock);
 }
 
-void set_bjf_params(int pid, int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio)
+void set_bjf_params(int pid, int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio,int process_size_ratio)
 {
   struct proc *p;
 
@@ -854,13 +857,15 @@ void set_bjf_params(int pid, int priority_ratio, int arrival_time_ratio, int exe
     {
       p->priority_ratio = priority_ratio;
       p->arrival_time_ratio = arrival_time_ratio;
-      p->executed_cycle_ratio = executed_cycle_ratio; 
+      p->executed_cycle_ratio = executed_cycle_ratio;
+      p->process_size_ratio = process_size_ratio;
+       
     }
   }
   release(&ptable.lock); 
 }
 
-void set_all_bjf_params(int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio)
+void set_all_bjf_params(int priority_ratio, int arrival_time_ratio, int executed_cycle_ratio,int process_size_ratio)
 {
   struct proc *p;
 
@@ -870,6 +875,7 @@ void set_all_bjf_params(int priority_ratio, int arrival_time_ratio, int executed
       p->priority_ratio = priority_ratio;
       p->arrival_time_ratio = arrival_time_ratio;
       p->executed_cycle_ratio = executed_cycle_ratio; 
+      p->process_size_ratio = process_size_ratio;
   }
   release(&ptable.lock); 
 }

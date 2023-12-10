@@ -119,19 +119,21 @@ sys_set_proc_queue(void)
 
 void sys_set_bjf_params(void)
 {
-  int pid, priority_ratio, arrival_time_ratio, executed_cycle_ratio;
+  int pid, priority_ratio, arrival_time_ratio, executed_cycle_ratio, process_size_ratio;
   argint(0, &pid);
   argint(1, &priority_ratio);
   argint(2, &arrival_time_ratio);
   argint(3, &executed_cycle_ratio);
-  set_bjf_params(pid, priority_ratio, arrival_time_ratio, executed_cycle_ratio);
+  argint(4, &process_size_ratio);
+  set_bjf_params(pid, priority_ratio, arrival_time_ratio, executed_cycle_ratio , process_size_ratio);
 }
 void sys_set_all_bjf_params(void)
 {
-  int priority_ratio, arrival_time_ratio, executed_cycle_ratio;
+  int priority_ratio, arrival_time_ratio, executed_cycle_ratio, process_size_ratio;
   argint(0, &priority_ratio);
   argint(1, &arrival_time_ratio);
   argint(2, &executed_cycle_ratio);
-  set_all_bjf_params(priority_ratio, arrival_time_ratio, executed_cycle_ratio);
+  argint(3, &process_size_ratio);
+  set_all_bjf_params(priority_ratio, arrival_time_ratio, executed_cycle_ratio , process_size_ratio);
 }
 //************************************************************************************************
